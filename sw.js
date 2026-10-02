@@ -2,7 +2,7 @@
 // 一度読み込んだ画面を端末に保存し、電波がなくても開けるようにする。
 // 売上などのデータは扱わない（データは今まで通り localStorage に保存）。
 // 版を上げるときは、index.html の APP_VERSION と同じ文字にそろえる（違うと「新しい版があります」が出る）
-const VERSION = '2026-10-02c';
+const VERSION = '2026-10-02d';
 const CACHE = 'myregi-' + VERSION;
 const FILES = ['./', './index.html', './manifest.webmanifest', './icon-v2-192.png', './icon-v2-512.png'];
 

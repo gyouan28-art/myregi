@@ -647,6 +647,9 @@
     .empty-text { font-size: 15px; }
     .no-products { grid-column: 1 / -1; text-align: center; padding: 28px 16px; color: var(--text-muted); font-size: 15px; line-height: 1.7; }
 
+    /* hidden を付けた要素は、display の指定があっても必ず隠す */
+    [hidden] { display: none !important; }
+
     .update-bar {
       position: fixed;
       top: 0;
@@ -1294,7 +1297,7 @@
 </div>
 
 <script>
-const APP_VERSION = '2026-10-02c';
+const APP_VERSION = '2026-10-02d';
 let offlineReady = false;
 let storagePersisted = false;
 
