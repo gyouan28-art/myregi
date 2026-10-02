@@ -647,6 +647,37 @@
     .empty-text { font-size: 15px; }
     .no-products { grid-column: 1 / -1; text-align: center; padding: 28px 16px; color: var(--text-muted); font-size: 15px; line-height: 1.7; }
 
+    .update-bar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 1900;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: calc(10px + env(safe-area-inset-top, 0px)) 16px 10px;
+      background: #1e293b;
+      color: white;
+      font-size: 15px;
+      font-weight: 700;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+    }
+    .update-bar button {
+      border: none;
+      border-radius: 10px;
+      padding: 9px 16px;
+      font-size: 15px;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+    }
+    .update-bar .update-yes { background: var(--primary); color: white; }
+    .update-bar .update-later { background: transparent; color: #cbd5e1; border: 1px solid #475569; }
+    .update-bar .update-note { flex-basis: 100%; text-align: center; font-size: 13px; font-weight: 600; color: #fde68a; }
+
     .toast {
       position: fixed;
       bottom: calc(var(--nav-h) + 12px + env(safe-area-inset-bottom, 0px));
@@ -851,6 +882,12 @@
 <body class="mode-register">
 
 <!-- ===== HEADER ===== -->
+<div class="update-bar" id="update-bar" hidden>
+  <span>新しい版があります。更新しますか？</span>
+  <button class="update-yes" onclick="applyUpdate()">はい、更新する</button>
+  <button class="update-later" onclick="document.getElementById('update-bar').hidden = true">あとで</button>
+  <div class="update-note" id="update-note" hidden>会計中の商品があります。会計が終わってから「はい、更新する」を押してね</div>
+</div>
 <div class="header">
   <div>
     <div class="header-title" id="header-title">🏪 マイレジ</div>
@@ -1257,7 +1294,7 @@
 </div>
 
 <script>
-const APP_VERSION = '2026-10-02b';
+const APP_VERSION = '2026-10-02c';
 let offlineReady = false;
 let storagePersisted = false;
 
@@ -2693,8 +2730,20 @@ init();
 // ============================================================
 (function setupPWA() {
   if (!('serviceWorker' in navigator) || !/^https?:$/.test(location.protocol)) return;
+  // 端末に入った新しい版（サービスワーカー）と、いま表示している画面の版を比べ、違えば「更新しますか？」を出す
+  navigator.serviceWorker.addEventListener('message', e => {
+    if (e.data && e.data.version) maybeShowUpdateBar(e.data.version);
+  });
+  navigator.serviceWorker.addEventListener('controllerchange', askWorkerVersion);
   navigator.serviceWorker.register('sw.js')
-    .then(() => navigator.serviceWorker.ready)
+    .then(reg => {
+      // アプリを開いたまま画面に戻ってきたときも、新しい版がないか確かめる
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') reg.update().then(askWorkerVersion).catch(() => {});
+      });
+      return navigator.serviceWorker.ready;
+    })
+    .then(reg => { askWorkerVersion(); return reg; })
     .then(() => { offlineReady = true; updateStorageInfo(); })
     .catch(() => {});
   // 端末の空き容量が減っても、ブラウザが勝手にデータを消さないように頼んでおく
@@ -2702,6 +2751,29 @@ init();
     navigator.storage.persist().then(v => { storagePersisted = v; updateStorageInfo(); }).catch(() => {});
   }
 })();
+
+function askWorkerVersion() {
+  const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
+  if (sw) sw.postMessage('version?');
+}
+
+function maybeShowUpdateBar(workerVersion) {
+  if (workerVersion === APP_VERSION) return;
+  // 更新したのに版が変わらなかったときは、くり返し出さない
+  try { if (sessionStorage.getItem('myregi-updated-to') === workerVersion) return; } catch (e) {}
+  document.getElementById('update-bar').hidden = false;
+  document.getElementById('update-bar').dataset.version = workerVersion;
+}
+
+// 新しい版に切り替える。会計の途中（カートに商品がある）なら、消えてしまうので待ってもらう
+function applyUpdate() {
+  if (cart.length > 0) {
+    document.getElementById('update-note').hidden = false;
+    return;
+  }
+  try { sessionStorage.setItem('myregi-updated-to', document.getElementById('update-bar').dataset.version || ''); } catch (e) {}
+  location.reload();
+}
 
 // Close past modal on backdrop tap
 document.getElementById('past-sale-modal').addEventListener('click', function(e) {
