@@ -540,6 +540,7 @@
       cursor: pointer;
     }
     .status-choice button.selected { border-color: var(--primary); background: var(--primary); color: white; }
+    .image-set-text { font-size: 14px; color: var(--text-muted); margin-bottom: 10px; line-height: 1.6; }
     .status-help { font-size: 12px; color: var(--text-muted); margin-top: 6px; }
     .product-list-thumb {
       width: 52px;
@@ -920,6 +921,11 @@
   <!-- ======== 商品管理ページ ======== -->
   <div id="page-products" class="page">
     <button class="btn btn-primary" onclick="openAddProduct()">＋ 商品を追加</button>
+    <div class="card" id="image-set-box" hidden>
+      <div class="card-title">用意した商品画像があります</div>
+      <div class="image-set-text">対象：<span id="image-set-names"></span><br>画像がまだない商品にだけ入ります。売上や価格は変わりません。</div>
+      <button class="btn btn-primary" onclick="applyImageSet()">画像を入れる</button>
+    </div>
     <div class="card">
       <div class="card-title">登録商品一覧（▲▼でレジ画面の並び順を変えられます）</div>
       <div id="product-list">
@@ -1251,7 +1257,7 @@
 </div>
 
 <script>
-const APP_VERSION = '2026-10-02';
+const APP_VERSION = '2026-10-02b';
 let offlineReady = false;
 let storagePersisted = false;
 
@@ -1294,6 +1300,7 @@ function init() {
   renderProductList();
   updateCartUI();
   setupAdminButton();
+  loadImageSet();
 }
 
 // ============================================================
@@ -1427,6 +1434,7 @@ function renderProductList() {
       </div>
     </div>
   `).join('');
+  renderImageSetBox();
 }
 
 // 商品の状態：販売中（なにも付かない）／販売停止（stopped：レジに出るが押せない）／非表示（hidden：レジに出ない）
@@ -1477,6 +1485,44 @@ function toggleStopped(id) {
   renderProductList();
   updateCartUI();
   showToast(p.stopped ? `「${p.name}」を販売停止にしました` : `「${p.name}」の販売を再開しました`);
+}
+
+// 用意した商品画像（image-set.json）を、商品名が一致して画像がまだない商品にだけ入れる。
+// 売上・価格などには触らない。電波がなくて読めないときは何も表示しない。
+let imageSet = null;
+function loadImageSet() {
+  fetch('image-set.json', { cache: 'no-cache' })
+    .then(r => r.ok ? r.json() : null)
+    .then(d => { imageSet = d; renderImageSetBox(); })
+    .catch(() => {});
+}
+
+function imageSetTargets() {
+  if (!imageSet || !imageSet.images) return [];
+  return products.filter(p => imageSet.images[p.name] && !p.image);
+}
+
+function renderImageSetBox() {
+  const box = document.getElementById('image-set-box');
+  if (!box) return;
+  const targets = imageSetTargets();
+  box.hidden = targets.length === 0;
+  document.getElementById('image-set-names').textContent = targets.map(p => p.name).join('・');
+}
+
+function applyImageSet() {
+  const targets = imageSetTargets();
+  if (targets.length === 0) return;
+  const before = products.map(x => ({ ...x }));
+  targets.forEach(p => { p.image = imageSet.images[p.name]; });
+  if (!saveProductsToStorage()) {
+    products = before;
+    showToast('保存容量が足りず、画像を入れられませんでした');
+    return;
+  }
+  renderProductGrid();
+  renderProductList();
+  showToast(targets.length + '品に画像を入れました');
 }
 
 function moveProduct(id, delta) {
