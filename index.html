@@ -491,9 +491,56 @@
       padding: 12px 0;
       border-bottom: 1px solid var(--border);
       gap: 10px;
+      flex-wrap: wrap;
     }
     .product-list-item:last-child { border-bottom: none; }
     .product-list-item.is-hidden { opacity: 0.5; }
+    .product-list-item.is-stopped .product-list-thumb { opacity: 0.5; }
+    .product-btn.is-stopped { cursor: default; border-color: var(--border); }
+    .product-btn.is-stopped:active { transform: none; }
+    .product-btn.is-stopped .product-img,
+    .product-btn.is-stopped .product-noimg { opacity: 0.35; filter: grayscale(1); }
+    .product-btn.is-stopped .product-btn-price { color: var(--text-muted); }
+    .stopped-label {
+      position: absolute;
+      top: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 4px 12px;
+      border-radius: 14px;
+      background: #475569;
+      color: white;
+      font-size: 14px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    .product-tag {
+      display: inline-block;
+      margin: 2px 4px 0 0;
+      padding: 1px 8px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 700;
+      background: #e2e8f0;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+    .product-tag.tag-stopped { background: #fee2e2; color: var(--danger); }
+    .status-choice { display: flex; gap: 6px; }
+    .status-choice button {
+      flex: 1;
+      padding: 10px 4px;
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      background: white;
+      color: var(--text-muted);
+      font-size: 15px;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+    }
+    .status-choice button.selected { border-color: var(--primary); background: var(--primary); color: white; }
+    .status-help { font-size: 12px; color: var(--text-muted); margin-top: 6px; }
     .product-list-thumb {
       width: 52px;
       height: 39px;
@@ -506,7 +553,7 @@
     .product-list-name { flex: 1; font-size: 16px; font-weight: 600; min-width: 0; word-break: break-all; }
     .product-list-name small { display: block; font-size: 12px; color: var(--text-muted); font-weight: 500; }
     .product-list-price { font-size: 16px; font-weight: 800; color: var(--primary); min-width: 64px; text-align: right; }
-    .product-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+    .product-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; flex-basis: 100%; }
     .order-btns { display: flex; flex-direction: column; gap: 4px; }
     .order-btn {
       width: 32px;
@@ -1083,6 +1130,11 @@
       <input type="number" class="form-input" id="input-price" placeholder="例：500" min="0" max="99999" inputmode="numeric">
     </div>
     <div class="form-group">
+      <label class="form-label">カテゴリ（なくてもOK）</label>
+      <input type="text" class="form-input" id="input-category" placeholder="例：たい焼き・米粉・飲み物" maxlength="20" list="category-options">
+      <datalist id="category-options"></datalist>
+    </div>
+    <div class="form-group">
       <label class="form-label">商品画像</label>
       <div class="image-picker">
         <div id="image-preview-wrap"></div>
@@ -1096,10 +1148,13 @@
       </div>
     </div>
     <div class="form-group">
-      <label class="check-row">
-        <input type="checkbox" id="input-visible" checked>
-        レジ画面に表示する
-      </label>
+      <label class="form-label">状態</label>
+      <div class="status-choice" id="input-status">
+        <button type="button" data-status="on" onclick="setEditingStatus('on')">販売中</button>
+        <button type="button" data-status="stopped" onclick="setEditingStatus('stopped')">販売停止</button>
+        <button type="button" data-status="hidden" onclick="setEditingStatus('hidden')">非表示</button>
+      </div>
+      <div class="status-help" id="input-status-help"></div>
     </div>
     <div class="modal-btns">
       <button class="btn btn-outline" onclick="closeProductModal()">キャンセル</button>
@@ -1196,7 +1251,7 @@
 </div>
 
 <script>
-const APP_VERSION = '2026-10-01';
+const APP_VERSION = '2026-10-02';
 let offlineReady = false;
 let storagePersisted = false;
 
@@ -1214,6 +1269,7 @@ let paymentStr       = '';
 let numpadOpen       = false;
 let editingId        = null;
 let editingImage     = null;
+let editingStatus    = 'on';
 let editingExpenseId = null;
 
 // localStorage への保存。容量不足などで失敗したら false を返す
@@ -1322,8 +1378,9 @@ function renderProductGrid() {
     return;
   }
   grid.innerHTML = visible.map(p => `
-    <button class="product-btn" data-id="${p.id}" onclick="addToCart(${p.id})">
+    <button class="product-btn${p.stopped ? ' is-stopped' : ''}" data-id="${p.id}" onclick="addToCart(${p.id})">
       ${productVisual(p, 'product-img')}
+      ${p.stopped ? '<div class="stopped-label">販売停止</div>' : ''}
       <div class="product-badge" style="display:none"></div>
       <div class="product-btn-body">
         <div class="product-btn-name">${esc(p.name)}</div>
@@ -1355,20 +1412,71 @@ function renderProductList() {
     return;
   }
   el.innerHTML = products.map((p, idx) => `
-    <div class="product-list-item${p.hidden ? ' is-hidden' : ''}">
+    <div class="product-list-item${p.hidden ? ' is-hidden' : ''}${p.stopped && !p.hidden ? ' is-stopped' : ''}">
       <div class="order-btns">
         <button class="order-btn" onclick="moveProduct(${p.id}, -1)" ${idx === 0 ? 'disabled' : ''}>▲</button>
         <button class="order-btn" onclick="moveProduct(${p.id},  1)" ${idx === products.length - 1 ? 'disabled' : ''}>▼</button>
       </div>
       ${productVisual(p, 'product-list-thumb')}
-      <div class="product-list-name">${esc(p.name)}${p.hidden ? '<small>レジ画面に表示しない</small>' : ''}</div>
+      <div class="product-list-name">${esc(p.name)}${productTags(p)}</div>
       <div class="product-list-price">¥${p.price.toLocaleString()}</div>
       <div class="product-actions">
         <button class="btn btn-outline btn-sm" onclick="openEditProduct(${p.id})">編集</button>
+        ${p.hidden ? '' : `<button class="btn btn-outline btn-sm" onclick="toggleStopped(${p.id})">${p.stopped ? '販売再開' : '販売停止'}</button>`}
         <button class="btn btn-danger btn-sm"  onclick="deleteProduct(${p.id})">削除</button>
       </div>
     </div>
   `).join('');
+}
+
+// 商品の状態：販売中（なにも付かない）／販売停止（stopped：レジに出るが押せない）／非表示（hidden：レジに出ない）
+function productStatus(p) {
+  return p.hidden ? 'hidden' : (p.stopped ? 'stopped' : 'on');
+}
+
+function productTags(p) {
+  let html = '';
+  if (p.category)     html += `<span class="product-tag">${esc(p.category)}</span>`;
+  if (p.hidden)       html += '<span class="product-tag">非表示</span>';
+  else if (p.stopped) html += '<span class="product-tag tag-stopped">販売停止</span>';
+  return html ? `<small>${html}</small>` : '';
+}
+
+const STATUS_HELP = {
+  on:      'レジ画面に出て、会計できます',
+  stopped: 'レジ画面に「販売停止」と出て、押せなくなります（売り切れ・季節外など）',
+  hidden:  'レジ画面に出しません（売上の記録はそのまま残ります）',
+};
+function setEditingStatus(status) {
+  editingStatus = status;
+  document.querySelectorAll('#input-status button').forEach(b =>
+    b.classList.toggle('selected', b.dataset.status === status));
+  document.getElementById('input-status-help').textContent = STATUS_HELP[status];
+}
+
+// カテゴリ入力欄の候補（登録済みのカテゴリ）
+function renderCategoryOptions() {
+  const cats = [...new Set(products.map(p => p.category).filter(Boolean))];
+  document.getElementById('category-options').innerHTML =
+    cats.map(c => `<option value="${esc(c)}"></option>`).join('');
+}
+
+function applyStatus(p, status) {
+  if (status === 'hidden')  p.hidden = true;  else delete p.hidden;
+  if (status === 'stopped') p.stopped = true; else delete p.stopped;
+}
+
+function toggleStopped(id) {
+  const p = products.find(x => x.id === id);
+  if (!p) return;
+  const before = products.map(x => ({ ...x }));
+  applyStatus(p, p.stopped ? 'on' : 'stopped');
+  if (!saveProductsToStorage()) { products = before; showToast('保存できませんでした'); return; }
+  if (p.stopped) cart = cart.filter(x => x.id !== id);
+  renderProductGrid();
+  renderProductList();
+  updateCartUI();
+  showToast(p.stopped ? `「${p.name}」を販売停止にしました` : `「${p.name}」の販売を再開しました`);
 }
 
 function moveProduct(id, delta) {
@@ -1395,7 +1503,9 @@ function openAddProduct() {
   document.getElementById('modal-title').textContent = '商品を追加';
   document.getElementById('input-name').value  = '';
   document.getElementById('input-price').value = '';
-  document.getElementById('input-visible').checked = true;
+  document.getElementById('input-category').value = '';
+  renderCategoryOptions();
+  setEditingStatus('on');
   renderImagePreview();
   document.getElementById('product-modal').classList.add('open');
   setTimeout(() => document.getElementById('input-name').focus(), 150);
@@ -1409,7 +1519,9 @@ function openEditProduct(id) {
   document.getElementById('modal-title').textContent = '商品を編集';
   document.getElementById('input-name').value  = p.name;
   document.getElementById('input-price').value = p.price;
-  document.getElementById('input-visible').checked = !p.hidden;
+  document.getElementById('input-category').value = p.category || '';
+  renderCategoryOptions();
+  setEditingStatus(productStatus(p));
   renderImagePreview();
   document.getElementById('product-modal').classList.add('open');
 }
@@ -1461,7 +1573,8 @@ function removeProductImage() {
 function saveProduct() {
   const name  = document.getElementById('input-name').value.trim();
   const price = parseInt(document.getElementById('input-price').value);
-  const hidden = !document.getElementById('input-visible').checked;
+  const category = document.getElementById('input-category').value.trim();
+  const status = editingStatus;
   if (!name)                   { showToast('商品名を入力してください');     return; }
   if (isNaN(price) || price < 0) { showToast('正しい価格を入力してください'); return; }
 
@@ -1472,12 +1585,14 @@ function saveProduct() {
       p.name = name;
       p.price = price;
       if (editingImage) p.image = editingImage; else delete p.image;
-      if (hidden) p.hidden = true; else delete p.hidden;
+      if (category) p.category = category; else delete p.category;
+      applyStatus(p, status);
     }
   } else {
     const p = { id: Date.now(), name, price };
     if (editingImage) p.image = editingImage;
-    if (hidden) p.hidden = true;
+    if (category) p.category = category;
+    applyStatus(p, status);
     products.push(p);
   }
 
@@ -1490,7 +1605,7 @@ function saveProduct() {
   // Update cart if product is there
   const ci = cart.find(x => x.id === editingId);
   if (ci) { ci.name = name; ci.price = price; }
-  if (hidden) cart = cart.filter(x => x.id !== editingId);
+  if (status !== 'on') cart = cart.filter(x => x.id !== editingId);
 
   renderProductGrid();
   renderProductList();
@@ -1500,7 +1615,24 @@ function saveProduct() {
 }
 
 function deleteProduct(id) {
-  if (!confirm('この商品を削除しますか？\n（これまでの売上記録は消えません）')) return;
+  const p = products.find(x => x.id === id);
+  if (!p) return;
+  // 売ったことのある商品は消さずに「非表示」にする（売上の記録と商品の対応を残すため）
+  const sold = sales.some(s => (s.items || []).some(i => i.id === id));
+  if (sold) {
+    if (p.hidden) { showToast('売上の記録がある商品なので、非表示のまま残しておきます'); return; }
+    if (!confirm(`「${p.name}」は売上の記録があるので、削除せず「非表示」にします。\n（あとで「編集」から販売中に戻せます）`)) return;
+    const before = products.map(x => ({ ...x }));
+    applyStatus(p, 'hidden');
+    if (!saveProductsToStorage()) { products = before; showToast('保存できませんでした'); return; }
+    cart = cart.filter(x => x.id !== id);
+    renderProductGrid();
+    renderProductList();
+    updateCartUI();
+    showToast('非表示にしました');
+    return;
+  }
+  if (!confirm('この商品を削除しますか？\n（まだ一度も売れていない商品です）')) return;
   products = products.filter(x => x.id !== id);
   cart     = cart.filter(x => x.id !== id);
   saveProductsToStorage();
@@ -1516,6 +1648,7 @@ function deleteProduct(id) {
 function addToCart(productId) {
   const p = products.find(x => x.id === productId);
   if (!p) return;
+  if (p.stopped) { showToast('この商品は販売停止中です'); return; }
   const existing = cart.find(x => x.id === productId);
   if (existing) {
     existing.qty++;

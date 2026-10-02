@@ -1,7 +1,7 @@
 // マイレジ オフライン用サービスワーカー
 // 一度読み込んだ画面を端末に保存し、電波がなくても開けるようにする。
 // 売上などのデータは扱わない（データは今まで通り localStorage に保存）。
-const CACHE = 'myregi-v2';
+const CACHE = 'myregi-v3';
 const FILES = ['./', './index.html', './manifest.webmanifest', './icon-v2-192.png', './icon-v2-512.png'];
 
 self.addEventListener('install', event => {
