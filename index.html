@@ -970,6 +970,12 @@
     .cust-reset { font-size: 15px; padding: 18px 16px; }
     .cust-done-no { font-size: 72px; font-weight: 900; color: var(--primary); line-height: 1; }
     .cust-done-msg { font-size: 18px; font-weight: 700; text-align: center; margin: 14px 0 4px; line-height: 1.5; }
+    /* お客様向けの確認・受付画面は、文字を大きく太く */
+    .cust-modal { max-width: 520px; }
+    .cust-modal .modal-header { font-size: 26px; text-align: center; }
+    .cust-modal .receipt-row { font-size: 21px; font-weight: 700; padding: 6px 0; }
+    .cust-modal .receipt-total-row { font-size: 26px; font-weight: 900; }
+    .cust-modal .modal-btns .btn { font-size: 20px; padding: 18px; }
     .cust-cancel-link {
       display: block;
       margin: 14px auto 0;
@@ -1438,7 +1444,7 @@
 
 <!-- お客様：注文の確認 -->
 <div class="modal-overlay" id="cust-confirm-modal">
-  <div class="modal">
+  <div class="modal cust-modal">
     <div class="modal-header">この内容でよろしいですか？</div>
     <div id="cust-confirm-items"></div>
     <div class="receipt-total-row">
@@ -1454,7 +1460,7 @@
 
 <!-- お客様：注文の受付完了 -->
 <div class="modal-overlay" id="cust-done-modal">
-  <div class="modal">
+  <div class="modal cust-modal">
     <div class="receipt-badge">
       <div class="receipt-badge-label">受付番号</div>
       <div class="cust-done-no" id="cust-done-no">001</div>
@@ -1471,7 +1477,7 @@
 </div>
 
 <script>
-const APP_VERSION = '2026-10-07a';
+const APP_VERSION = '2026-10-07b';
 let offlineReady = false;
 let storagePersisted = false;
 
