@@ -931,6 +931,17 @@
     .cust-noimg { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; font-size: 52px; font-weight: 800; color: white; }
     .cust-item-body { padding: 8px 6px 10px; flex-shrink: 0; }
     .cust-item-name { font-size: clamp(16px, 2.2vw, 24px); font-weight: 700; line-height: 1.25; word-break: break-all; }
+    .cust-item-desc {
+      font-size: clamp(13px, 1.6vw, 17px);
+      font-weight: 600;
+      color: var(--text-muted);
+      line-height: 1.35;
+      margin-top: 2px;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
     .cust-item-price { font-size: clamp(18px, 2.6vw, 28px); font-weight: 800; color: var(--primary); }
     .cust-item.is-soldout { cursor: default; }
     .cust-item.is-soldout:active { transform: none; }
@@ -1311,6 +1322,10 @@
       <datalist id="category-options"></datalist>
     </div>
     <div class="form-group">
+      <label class="form-label">お客様向けのひとこと説明（なくてもOK・30文字まで）</label>
+      <input type="text" class="form-input" id="input-desc" placeholder="例：北海道十勝産のつぶあん" maxlength="30" style="font-size:16px">
+    </div>
+    <div class="form-group">
       <label class="form-label">商品画像</label>
       <div class="image-picker">
         <div id="image-preview-wrap"></div>
@@ -1482,7 +1497,7 @@
 </div>
 
 <script>
-const APP_VERSION = '2026-10-07c';
+const APP_VERSION = '2026-10-07d';
 let offlineReady = false;
 let storagePersisted = false;
 
@@ -1793,6 +1808,7 @@ function openAddProduct() {
   renderCategoryOptions();
   setEditingStatus('on');
   document.getElementById('input-cust').checked = false;
+  document.getElementById('input-desc').value = '';
   renderImagePreview();
   document.getElementById('product-modal').classList.add('open');
   setTimeout(() => document.getElementById('input-name').focus(), 150);
@@ -1810,6 +1826,7 @@ function openEditProduct(id) {
   renderCategoryOptions();
   setEditingStatus(productStatus(p));
   document.getElementById('input-cust').checked = !!p.cust;
+  document.getElementById('input-desc').value = p.desc || '';
   renderImagePreview();
   document.getElementById('product-modal').classList.add('open');
 }
@@ -1864,6 +1881,7 @@ function saveProduct() {
   const category = document.getElementById('input-category').value.trim();
   const status = editingStatus;
   const custShow = document.getElementById('input-cust').checked;
+  const desc = document.getElementById('input-desc').value.trim();
   if (!name)                   { showToast('商品名を入力してください');     return; }
   if (isNaN(price) || price < 0) { showToast('正しい価格を入力してください'); return; }
 
@@ -1876,6 +1894,7 @@ function saveProduct() {
       if (editingImage) p.image = editingImage; else delete p.image;
       if (category) p.category = category; else delete p.category;
       if (custShow) p.cust = true; else delete p.cust;
+      if (desc) p.desc = desc; else delete p.desc;
       applyStatus(p, status);
     }
   } else {
@@ -1883,6 +1902,7 @@ function saveProduct() {
     if (editingImage) p.image = editingImage;
     if (category) p.category = category;
     if (custShow) p.cust = true;
+    if (desc) p.desc = desc;
     applyStatus(p, status);
     products.push(p);
   }
@@ -2188,9 +2208,10 @@ function custVisibleProducts() {
 function layoutCustomerGrid() {
   const grid = document.getElementById('cust-grid');
   if (document.getElementById('cust').hidden) return;
-  const n = custVisibleProducts().length;
+  const list = custVisibleProducts();
+  const n = list.length;
   if (n === 0) return;
-  const gap = 12, textH = 70;
+  const gap = 12, textH = list.some(p => p.desc) ? 115 : 70;
   const W = grid.clientWidth - 24, H = grid.clientHeight - 24;
   let bestCols = 1, bestScore = 0;
   for (let cols = 1; cols <= n; cols++) {
@@ -2226,6 +2247,7 @@ function renderCustomer() {
           <button class="cust-minus" aria-label="1つ減らす" onclick="event.stopPropagation(); custChange(${p.id}, -1)">−</button>` : ''}
         <div class="cust-item-body">
           <div class="cust-item-name">${esc(p.name)}</div>
+          ${p.desc ? `<div class="cust-item-desc">${esc(p.desc)}</div>` : ''}
           <div class="cust-item-price">¥${p.price.toLocaleString()}</div>
         </div>
       </div>`;
